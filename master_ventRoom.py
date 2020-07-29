@@ -2,15 +2,10 @@ import numpy
 from matplotlib import pyplot, cm
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.patches as patches
+import random
 
 
-# plotType = ‘stream’ or ‘vector’
-# nt is the number of timesteps
-# dt is the timestep length
-# peopleConfig is array, storing 1 or 0 based on where people are
-#	eg [0,1,1,0] means two people sitting
-# title is the title that the thing is saved as
-def ventExperiment(plotType, nt, dt, peopleConfig, title):
+def fluxGraph(nt, dt, peopleConfig, title, haveModule, haveHVAC):
 	# things set constant for this experiment
 	nx = 120
 	ny = 40
@@ -24,7 +19,17 @@ def ventExperiment(plotType, nt, dt, peopleConfig, title):
 	rho = 3
 	nu = .1
 	fanSpeed = 1.59
-	breath  = 0
+	HVACSpeed = 3
+	addS = "withModule"
+	if not haveModule:
+		addS = "withoutModule"
+		fanSpeed = 0
+	addX = "withHVAC"
+	if not haveHVAC:
+		addX = "withoutHVAC"
+		HVACSpeed = 0
+
+
 
 	u = numpy.zeros((ny, nx))
 	v = numpy.zeros((ny, nx))
@@ -32,15 +37,63 @@ def ventExperiment(plotType, nt, dt, peopleConfig, title):
 	b = numpy.zeros((ny, nx))
 
 
-	u, v, p = cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, nx,ny)
+	u, v, p = cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, HVACSpeed, nx,ny)
+	fig = pyplot.figure(figsize=(13,6), dpi=100)
+
+	u_sums = [sum(u[:,i]) for i in range(nx)]
+
+	pyplot.plot(x, u_sums)
+
+	pyplot.savefig('_fluxStuff_' + addS + '_' + addX + '_' + str(nt*dt) + '_' + title + '.png' )
+	pyploy.close()
+
+# plotType = ‘stream’ or ‘vector’
+# nt is the number of timesteps
+# dt is the timestep length
+# peopleConfig is array, storing 1 or 0 based on where people are
+#	eg [0,1,1,0] means two people sitting
+# title is the title that the thing is saved as
+def ventExperiment(plotType, nt, dt, peopleConfig, title, haveModule, haveHVAC):
+	# things set constant for this experiment
+	nx = 120
+	ny = 40
+	nit = 50
+	c = 1
+	dx = 2 / (nx - 1)
+	dy = 2 / (ny - 1)
+	x = numpy.linspace(0, int(nx/20), nx)
+	y = numpy.linspace(0, int(ny/20), ny)
+	X, Y = numpy.meshgrid(x, y)
+	rho = 3
+	nu = .1
+	fanSpeed = 1.59
+	HVACSpeed = 3
+	addS = "withModule"
+	if not haveModule:
+		addS = "withoutModule"
+		fanSpeed = 0
+	addX = "withHVAC"
+	if not haveHVAC:
+		addX = "withoutHVAC"
+		HVACSpeed = 0
+
+	u = numpy.zeros((ny, nx))
+	v = numpy.zeros((ny, nx))
+	p = numpy.zeros((ny, nx))
+	b = numpy.zeros((ny, nx))
+
+
+	u, v, p = cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, HVACSpeed, nx,ny)
 	fig = pyplot.figure(figsize=(13,6), dpi=100)
 
 	table1 = patches.Rectangle((1.0,0.4), 1, 0.1)
 	table2 = patches.Rectangle((4.0,0.4), 1, 0.1)
-	module1 = patches.Rectangle((1.5,0.5), 0.1, 0.1)
-	module2 = patches.Rectangle((4.5,0.5), 0.1, 0.1)
-
-	people = [table1,table2, module1, module2]
+	if haveModule:
+		module1 = patches.Rectangle((1.5,0.5), 0.1, 0.1)
+		module2 = patches.Rectangle((4.5,0.5), 0.1, 0.1)
+		people = [table1,table2, module1, module2]
+	else:
+		people = [table1,table2]
 	for i in range(len(peopleConfig)):
 		if peopleConfig[i] == 1:
 			if i == 0:
@@ -79,15 +132,16 @@ def ventExperiment(plotType, nt, dt, peopleConfig, title):
 		ax.add_patch(people[p])
 		pyplot.title("sds")
 		pyplot.title('t = ' + str(nt*dt) + 's')
-	pyplot.savefig(plotType + '_vent_' + str(nt*dt) + '_' + title + '.png' )
-	pyplot.show()
+
+	pyplot.savefig(plotType + '_vent_' + addS + '_' + addX + '_' + str(nt*dt) + '_' + title + '.png' )
 	pyplot.close()
 
 
 
 
 
-def cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, nx, ny):
+
+def cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, HVACSpeed,nx, ny):
     un = numpy.empty_like(u)
     vn = numpy.empty_like(v)
     b = numpy.zeros((ny, nx))
@@ -118,21 +172,18 @@ def cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, nx, ny
                         dt / (2 * rho * dy) * (p[2:, 1:-1] - p[0:-2, 1:-1]) +
                         nu * (dt / dx**2 *
                        (vn[1:-1, 2:] - 2 * vn[1:-1, 1:-1] + vn[1:-1, 0:-2]) +
-                        dt / dy**2 *
-                       (vn[2:, 1:-1] - 2 * vn[1:-1, 1:-1] + vn[0:-2, 1:-1])))
+                        dt / dy**2 * (vn[2:, 1:-1] - 2 * vn[1:-1, 1:-1] + vn[0:-2, 1:-1])))
         AC_bot = 2
         AC_top = 4
-
         u[0:AC_bot, 0]  = 0 #influx of air
-        u[AC_bot:AC_top, 0]  = 3 #influx of air
+        u[AC_bot:AC_top, 0]  = HVACSpeed #influx of air
         u[AC_top:-1, 0]  = 0 #influx of air
-
 
         #AC_bot = 2  + 30
         #AC_top = 5 + 30
 
         u[0:AC_bot, -1]  = 0 #influx of air
-        u[AC_bot:AC_top, -1]  = 3 #influx of air
+        u[AC_bot:AC_top, -1]  = HVACSpeed #influx of air
         u[AC_top:-1, -1]  = 0 #influx of air
 
         #table 1
@@ -145,6 +196,8 @@ def cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, nx, ny
 
         #rect3 = patches.Rectangle((2.2,0.4), 0.2, 0.3)
         #rect4 = patches.Rectangle((3.6,0.4), 0.2, 0.3)
+        v[11,29:31]=fanSpeed
+        v[11,89:91] =fanSpeed
 
 
         for i in range(len(peopleConfig)):
@@ -152,31 +205,26 @@ def cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, nx, ny
                 if i == 0:
                     v[8:14,12:16] = 0
                     u[8:14,12:16] = 0
-                    u[12, 18] = 2.2
+                    u[12, 18] = 2.2*numpy.sin(n * 2*3.1415/5000 + random.random())
                 if i == 1:
                     v[8:14,44:48] = 0
                     u[8:14,44:48] = 0
                     #breathe
-                    u[12, 42] = -2.2
+                    u[12, 42] = 2.2*numpy.sin(n * 2*3.1415/5000 + random.random() )
                 if i == 2:
                     v[8:14,72:76] = 0
                     u[8:14,72:76] = 0
                     #breathe
-                    u[12, 78] = 2.2
+                    u[12, 78] = 2.2*numpy.sin(n * 2*3.1415/5000 + random.random())
                 if i == 3:
                     v[8:14,104:108] = 0
                     u[8:14,104:108] = 0
                     #breathe
-                    u[12, 102] = -2.2
-
-        # fans
-        v[11,30] = fanSpeed
-        v[11,90] = fanSpeed
+                    u[12, 102] = 2.2*numpy.sin(n * 2*3.1415/5000 + random.random() )
 
         #The REST OF THE BOUNDARY CONDITIONS
         u[-1, :] = 0
         u[0, :]  = 0
-
         v[0, :]  = 0
         v[-1, :] = 0
         v[:, 0]  = 0
@@ -218,4 +266,12 @@ def build_up_b(b, rho, dt, u, v, dx, dy):
     return b
 
 
-ventExperiment('stream', 1000, 0.001, [0,1,1,0], 'sethDad')
+ventExperiment('stream', 1000, 0.001, [0,1,1,0], 'test1.1', True, True)
+ventExperiment('stream', 1000, 0.001, [0,1,0,1], 'test1.2', True, True)
+ventExperiment('stream', 1000, 0.001, [1,0,0,1], 'test1.3', True, True)
+ventExperiment('stream', 1000, 0.001, [1,0,1,0], 'test1.4', True, True)
+ventExperiment('stream', 1000, 0.001, [0,1,1,0], 'test1.5', False, False)
+ventExperiment('stream', 1000, 0.001, [1,0,0,1], 'test1.6', False, False)
+ventExperiment('stream', 1000, 0.001, [0,1,1,0], 'test1.7', True, False)
+fluxGraph(1000, 0.001, [0,1,1,0], 'test1.7', True, False)
+fluxGraph(1000, 0.001, [0,1,1,0], 'test1.1', True, True)
