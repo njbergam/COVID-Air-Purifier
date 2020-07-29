@@ -11,7 +11,7 @@ import matplotlib.patches as patches
 # peopleConfig is array, storing 1 or 0 based on where people are
 #	eg [0,1] means two people sitting
 # title is the title that the thing is saved as
-def oneTable(plotType, nt, dt, peopleConfig, title):
+def oneTable(plotType, nt, dt, peopleConfig, title, withModule, withHVAC):
 	# things set constant for this experiment
 	nx = 100
 	ny = 100
@@ -24,8 +24,13 @@ def oneTable(plotType, nt, dt, peopleConfig, title):
 	X, Y = numpy.meshgrid(x, y)
 	rho = 3
 	nu = .1
-	fanSpeed = 1.59
-	breath  = 0
+	fanSpeed = 0
+	if withModule:
+		fanSpeed = 1.59
+	HVACSpeed = 0
+	if withHVAC:
+		HVACSpeed = 3
+
 
 	u = numpy.zeros((ny, nx))
 	v = numpy.zeros((ny, nx))
@@ -33,7 +38,7 @@ def oneTable(plotType, nt, dt, peopleConfig, title):
 	b = numpy.zeros((ny, nx))
 
 
-	u, v, p = cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, nx,ny)
+	u, v, p = cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, HVACSpeed, nx,ny)
 	fig = pyplot.figure(figsize=(9,8), dpi=100)
 
 	table = patches.Rectangle((1.0,0.5), 2, 0.1)
@@ -73,13 +78,12 @@ def oneTable(plotType, nt, dt, peopleConfig, title):
 		ax.add_patch(people[p])
 	pyplot.title("sds")
 	pyplot.title('t = ' + str(nt*dt) + 's')
-	pyplot.savefig(plotType + '_vent_' + str(nt*dt) + '_' + title + '.png' )
-	pyplot.show()
+	pyplot.savefig(plotType + '_oneTable_' + str(nt*dt) + '_' + title + '.png' )
 	pyplot.close()
 
 
 
-def cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, nx, ny):
+def cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, HVACSpeed, nx, ny):
     un = numpy.empty_like(u)
     vn = numpy.empty_like(v)
     b = numpy.zeros((ny, nx))
@@ -112,7 +116,8 @@ def cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, nx, ny
                        (vn[1:-1, 2:] - 2 * vn[1:-1, 1:-1] + vn[1:-1, 0:-2]) +
                         dt / dy**2 *
                        (vn[2:, 1:-1] - 2 * vn[1:-1, 1:-1] + vn[0:-2, 1:-1])))
-
+        u[11:13,25:75] = 0
+        v[11:13,25:75] = 0
 
         #rect3 = patches.Rectangle((2.2,0.4), 0.2, 0.3)
         #rect4 = patches.Rectangle((3.6,0.4), 0.2, 0.3)
@@ -121,20 +126,28 @@ def cavity_flow(nt, u, v, dt, dx, dy, p, rho, nu, peopleConfig, fanSpeed, nx, ny
         for i in range(len(peopleConfig)):
             if peopleConfig[i] == 1:
                 if i == 0:
-                    v[8:14,15:20] = 0
-                    u[8:14,15:20] = 0
+                    v[16:25,15:20] = 0
+                    u[16:25,15:20] = 0
                     u[20, 23] = 2.2
                 if i == 1:
-                    v[8:14,80:85] = 0
-                    u[8:14,80:85] = 0
+                    v[16:25,80:85] = 0
+                    u[16:25,80:85] = 0
                     #breathe
                     u[20, 77] = 2.2
+
+
 
 
         # fans
         v[16,50] = fanSpeed
 
         #The REST OF THE BOUNDARY CONDITIONS
+        AC_bot = 2
+        AC_top = 4
+        u[0:AC_bot, 0]  = 0 #influx of air
+        u[AC_bot:AC_top, 0]  = HVACSpeed #influx of air
+        u[AC_top:-1, 0]  = 0 #influx of air
+
         u[-1, :] = 0
         u[0, :]  = 0
 
@@ -179,4 +192,5 @@ def build_up_b(b, rho, dt, u, v, dx, dy):
     return b
 
 
-oneTable('stream', 1000, 0.001, [1,1], 'sethDad')
+oneTable('vector', 1000, 0.001, [1,1], 'test0.5', True, False)
+
